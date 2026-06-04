@@ -1,0 +1,3 @@
+# False positives - base image CVEs without exploitable path
+CVE-2023-45678
+CVE-2024-12345

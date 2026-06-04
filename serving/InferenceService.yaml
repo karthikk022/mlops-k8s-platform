@@ -1,0 +1,72 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: loan-default-predictor
+  namespace: mlops
+  annotations:
+    serving.kserve.io/deploymentMode: Serverless
+    serving.kserve.io/autoscalerClass: hpa
+spec:
+  predictor:
+    minReplicas: 2
+    maxReplicas: 10
+    scaleMetric: concurrency
+    scaleTarget: 5
+    containers:
+      - name: kserve-container
+        image: mlops/model-server:latest
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: MODEL_URI
+            value: "models:/loan-default-model/latest"
+          - name: MODEL_VERSION
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.annotations['serving.kserve.io/model-version']
+        resources:
+          requests:
+            cpu: "1"
+            memory: 2Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+        readinessProbe:
+          httpGet:
+            path: /v2/health/ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        livenessProbe:
+          httpGet:
+            path: /v2/health/live
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: loan-default-predictor-hpa
+  namespace: mlops
+spec:
+  scaleTargetRef:
+    apiVersion: serving.kserve.io/v1beta1
+    kind: InferenceService
+    name: loan-default-predictor
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

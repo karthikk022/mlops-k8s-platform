@@ -1,0 +1,83 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: loan-default-predictor-vsvc
+  namespace: mlops
+spec:
+  hosts:
+    - loan-default-predictor
+  http:
+    - route:
+        - destination:
+            host: loan-default-predictor
+            subset: stable
+          weight: 90
+        - destination:
+            host: loan-default-predictor
+            subset: canary
+          weight: 10
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+      timeout: 10s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: loan-default-predictor-dr
+  namespace: mlops
+spec:
+  host: loan-default-predictor
+  subsets:
+    - name: stable
+      labels:
+        version: v1
+    - name: canary
+      labels:
+        version: v2
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 60s
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: loan-default-predictor-rollout
+  namespace: mlops
+spec:
+  replicas: 5
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: loan-default-predictor
+  template:
+    metadata:
+      labels:
+        app: loan-default-predictor
+        version: v2
+    spec:
+      containers:
+        - name: model
+          image: mlops/model-server:2.0.0
+          env:
+            - name: MODEL_VERSION
+              value: "2.0.0"
+          ports:
+            - containerPort: 8080
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10
+        - pause: { duration: 10m }
+        - setWeight: 30
+        - pause: { duration: 10m }
+        - setWeight: 60
+        - pause: { duration: 10m }
+        - setWeight: 100

@@ -1,0 +1,50 @@
+{
+  "title": "ML Model Performance",
+  "uid": "model-performance",
+  "tags": ["mlops", "models"],
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "title": "Prediction Volume",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"expr": "rate(kserve_predictions_total[5m])", "legendFormat": "{{model}}"}]
+    },
+    {
+      "title": "P99 Latency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.99, sum(rate(kserve_request_latency_seconds_bucket[5m])) by (le, model))", "legendFormat": "{{model}}"}]
+    },
+    {
+      "title": "Data Drift Score",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"expr": "evidently_data_drift_score", "legendFormat": "{{feature}}"}]
+    },
+    {
+      "title": "Model Accuracy (MLflow)",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+      "targets": [{"expr": "mlflow_metric_accuracy", "legendFormat": "accuracy"}]
+    },
+    {
+      "title": "Error Rate by Model",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 8},
+      "targets": [{"expr": "rate(kserve_errors_total[5m])", "legendFormat": "{{model}}"}]
+    },
+    {
+      "title": "Feature Store Request Latency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{"expr": "feast_request_latency_seconds", "legendFormat": "{{status}}"}]
+    },
+    {
+      "title": "Model Version Distribution",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{"expr": "count(mlflow_registered_model_version) by (model_name)", "legendFormat": "{{model_name}}"}]
+    }
+  ]
+}

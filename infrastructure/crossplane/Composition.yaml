@@ -1,0 +1,100 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xeksclusters.platform.mlops.io
+  labels:
+    provider: aws
+    type: eks
+spec:
+  compositeTypeRef:
+    apiVersion: platform.mlops.io/v1alpha1
+    kind: XEKSCluster
+  resources:
+    - name: eks-cluster
+      base:
+        apiVersion: eks.aws.upbound.io/v1beta1
+        kind: Cluster
+        spec:
+          forProvider:
+            region: ap-south-1
+            roleArnRef:
+              name: eks-role
+            version: "1.30"
+            vpcConfig:
+              - subnetIdRefs: []
+                endpointPrivateAccess: true
+                endpointPublicAccess: false
+          providerConfigRef:
+            name: aws-provider
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.version
+          toFieldPath: spec.forProvider.version
+    - name: node-group
+      base:
+        apiVersion: eks.aws.upbound.io/v1beta1
+        kind: NodeGroup
+        spec:
+          forProvider:
+            region: ap-south-1
+            scalingConfig:
+              - desiredSize: 3
+                maxSize: 10
+                minSize: 2
+            instanceTypes:
+              - m6i.xlarge
+          providerConfigRef:
+            name: aws-provider
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.nodeCount
+          toFieldPath: spec.forProvider.scalingConfig[0].desiredSize
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.instanceType
+          toFieldPath: spec.forProvider.instanceTypes[0]
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xmlservingenvironments.platform.mlops.io
+  labels:
+    provider: kubernetes
+    type: kserve
+spec:
+  compositeTypeRef:
+    apiVersion: platform.mlops.io/v1alpha1
+    kind: XMLServingEnvironment
+  resources:
+    - name: inference-service
+      base:
+        apiVersion: serving.kserve.io/v1beta1
+        kind: InferenceService
+        spec:
+          predictor:
+            minReplicas: 1
+            maxReplicas: 5
+            model:
+              modelFormat:
+                name: sklearn
+              storage:
+                key: aws-cred
+                path: s3://mlops-models/
+          providerConfigRef:
+            name: k8s-provider
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.modelName
+          toFieldPath: metadata.name
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.modelVersion
+          toFieldPath: spec.predictor.model.storage.path
+          transform:
+            type: string
+            string:
+              fmt: "s3://mlops-models/%s/%s"
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.minReplicas
+          toFieldPath: spec.predictor.minReplicas
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.maxReplicas
+          toFieldPath: spec.predictor.maxReplicas

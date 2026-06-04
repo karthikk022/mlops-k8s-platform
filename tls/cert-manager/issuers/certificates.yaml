@@ -1,0 +1,81 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mlflow-tls
+  namespace: mlops
+spec:
+  secretName: mlflow-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "mlflow.mlops.platform"
+    - "mlflow.prod.mlops.platform"
+  usages:
+    - server auth
+  keystores:
+    jks:
+      create: true
+      passwordSecretRef:
+        name: mlflow-tls-keystore-password
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-tls
+  namespace: monitoring
+spec:
+  secretName: grafana-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "grafana.mlops.platform"
+    - "grafana.prod.mlops.platform"
+  usages:
+    - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kserve-tls
+  namespace: mlops
+spec:
+  secretName: kserve-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.serve.mlops.platform"
+  usages:
+    - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: evidently-tls
+  namespace: monitoring
+spec:
+  secretName: evidently-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "evidently.mlops.platform"
+  usages:
+    - server auth
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vault-tls
+  namespace: vault
+spec:
+  secretName: vault-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "vault.mlops.platform"
+  usages:
+    - server auth

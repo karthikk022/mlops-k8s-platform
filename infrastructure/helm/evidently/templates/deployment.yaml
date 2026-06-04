@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: evidently
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: evidently
+    component: drift-monitor
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: evidently
+  template:
+    metadata:
+      labels:
+        app: evidently
+        component: drift-monitor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+    spec:
+      containers:
+        - name: evidently
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - evidently
+            - serve
+            - --host=0.0.0.0
+            - --port=8085
+          ports:
+            - containerPort: 8085
+              name: http
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}

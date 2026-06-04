@@ -1,0 +1,105 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Test type to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - model-serving
+          - mlflow-api
+          - feature-store
+          - soak
+          - stress
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday 6 AM
+
+env:
+  AWS_REGION: ap-south-1
+  CLUSTER_NAME: mlops-staging
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Install k6
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Port-forward services
+        run: |
+          kubectl port-forward -n mlops svc/loan-default-predictor-predictor 8080:8080 &
+          kubectl port-forward -n mlops svc/mlflow 5000:5000 &
+          kubectl port-forward -n mlops svc/feast-feature-server 6566:6566 &
+          sleep 10
+          echo "Port-forwards active"
+
+      - name: Run model serving test
+        if: ${{ github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'model-serving' }}
+        run: |
+          k6 run load-testing/k6/scripts/model-serving.js \
+            -e MODEL_ENDPOINT=http://localhost:8080 \
+            --summary-export=load-testing/reports/model-serving.json
+        continue-on-error: true
+
+      - name: Run MLflow API test
+        if: ${{ github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'mlflow-api' }}
+        run: |
+          k6 run load-testing/k6/scripts/mlflow-api.js \
+            -e MLFLOW_ENDPOINT=http://localhost:5000 \
+            --summary-export=load-testing/reports/mlflow-api.json
+        continue-on-error: true
+
+      - name: Run feature store test
+        if: ${{ github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'feature-store' }}
+        run: |
+          k6 run load-testing/k6/scripts/feature-store.js \
+            -e FEAST_ENDPOINT=http://localhost:6566 \
+            --summary-export=load-testing/reports/feature-store.json
+        continue-on-error: true
+
+      - name: Run soak test
+        if: ${{ github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'soak' }}
+        run: |
+          k6 run load-testing/k6/scripts/soak-test.js \
+            -e MODEL_ENDPOINT=http://localhost:8080 \
+            --summary-export=load-testing/reports/soak.json
+        continue-on-error: true
+
+      - name: Run stress test
+        if: ${{ github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'stress' }}
+        run: |
+          k6 run load-testing/k6/scripts/stress-test.js \
+            -e MODEL_ENDPOINT=http://localhost:8080 \
+            --summary-export=load-testing/reports/stress.json
+        continue-on-error: true
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-reports
+          path: load-testing/reports/
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -f "kubectl port-forward" || true

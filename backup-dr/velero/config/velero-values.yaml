@@ -1,0 +1,51 @@
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: mlops-velero-backups
+      config:
+        region: ap-south-1
+        s3ForcePathStyle: "false"
+        s3Url: "https://s3.ap-south-1.amazonaws.com"
+  volumeSnapshotLocation:
+    - name: default
+      provider: aws
+      config:
+        region: ap-south-1
+
+credentials:
+  useSecret: true
+  name: cloud-credentials
+  secretContents:
+    cloud: |
+      [default]
+      aws_access_key_id=CHANGEME
+      aws_secret_access_key=CHANGEME
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.9.0
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+schedules:
+  default:
+    disabled: false
+    template:
+      ttl: 720h
+      defaultVolumesToRestic: true
+    schedule: "0 */4 * * *"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+serviceAccount:
+  server:
+    annotations:
+      eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/velero-backups

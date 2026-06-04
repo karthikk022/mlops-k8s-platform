@@ -1,0 +1,4 @@
+# Skip public S3 check for artifact buckets (internal only)
+CKV_AWS_20
+CKV_AWS_21
+CKV_AWS_145

@@ -1,0 +1,57 @@
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: mlops-daily-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"
+  template:
+    includedNamespaces:
+      - mlops
+      - monitoring
+    excludedResources:
+      - pods
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/managed-by: helm
+    ttl: 336h
+    defaultVolumesToRestic: true
+    storageLocation: default
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: mlops-weekly-full
+  namespace: velero
+spec:
+  schedule: "0 4 * * 0"
+  template:
+    includedNamespaces:
+      - "*"
+    ttl: 720h
+    defaultVolumesToRestic: true
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: mlops-mlflow-db
+  namespace: velero
+spec:
+  schedule: "0 */2 * * *"
+  template:
+    includedNamespaces:
+      - mlops
+    labelSelector:
+      matchLabels:
+        app: mlflow
+    ttl: 48h
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: mlops-velero-daily
+  namespace: velero
+spec:
+  schedule: "0 3 * * *"
+  template:
+    ttl: 720h

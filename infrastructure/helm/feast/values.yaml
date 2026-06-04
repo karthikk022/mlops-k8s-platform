@@ -1,0 +1,19 @@
+environment: dev
+replicas: 1
+
+image:
+  repository: feastdev/feature-server
+  tag: 0.38.0
+  pullPolicy: IfNotPresent
+
+redis:
+  host: redis-master
+  port: 6379
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 2Gi

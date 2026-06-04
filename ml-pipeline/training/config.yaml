@@ -1,0 +1,18 @@
+tracking_uri: http://mlflow.mlops:5000
+experiment_name: mlops-platform/loan-default-model
+
+data:
+  train_path: s3://mlops-data/processed/train.parquet
+  test_path: s3://mlops-data/processed/test.parquet
+  target_column: label
+
+model:
+  type: gradient_boosting
+  params:
+    n_estimators: 200
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+    min_samples_leaf: 20
+
+register_model: true

@@ -1,0 +1,56 @@
+{
+  "title": "ML Infrastructure Health",
+  "uid": "ml-infrastructure",
+  "tags": ["mlops", "infrastructure"],
+  "schemaVersion": 38,
+  "panels": [
+    {
+      "title": "Cluster CPU",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+      "targets": [{"expr": "sum(node:node_cpu_utilization:avg)", "legendFormat": "CPU"}]
+    },
+    {
+      "title": "Cluster Memory",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0},
+      "targets": [{"expr": "sum(node_namespace_pod_memory_utilization)", "legendFormat": "Memory"}]
+    },
+    {
+      "title": "Pod Restarts",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+      "targets": [{"expr": "rate(kube_pod_container_status_restarts_total[1h])", "legendFormat": "{{pod}}"}]
+    },
+    {
+      "title": "EKS Node Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 8},
+      "targets": [{"expr": "count(kube_node_status_condition{condition='Ready', status='true'})", "legendFormat": "Ready"}]
+    },
+    {
+      "title": "GPU Utilization",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 4, "y": 8},
+      "targets": [{"expr": "nvidia_gpu_utilization", "legendFormat": "GPU {{$labels.gpu}}"}]
+    },
+    {
+      "title": "MLflow Health",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 8},
+      "targets": [{"expr": "up{job='mlflow'}", "legendFormat": "MLflow"}]
+    },
+    {
+      "title": "Namespace Resource Quota",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "targets": [{"expr": "kube_resourcequota{namespace='mlops'}", "legendFormat": "{{resource}}"}]
+    },
+    {
+      "title": "Service Status",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "targets": [{"expr": "up{namespace='mlops'}", "legendFormat": "{{service}}"}]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "stages": [
+    { "duration": "2m", "target": 10 },
+    { "duration": "5m", "target": 50 },
+    { "duration": "3m", "target": 100 },
+    { "duration": "10m", "target": 100 },
+    { "duration": "3m", "target": 0 }
+  ],
+  "thresholds": {
+    "http_req_duration": ["p(99)<2000", "p(95)<1000", "avg<500"],
+    "http_req_failed": ["rate<0.01"],
+    "iterations": ["count>5000"]
+  },
+  "targets": {
+    "model_serving": "http://loan-default-predictor.mlops.svc.cluster.local:8080",
+    "mlflow_api": "http://mlflow.mlops:5000",
+    "feature_store": "http://feast-feature-server.mlops:6566"
+  }
+}

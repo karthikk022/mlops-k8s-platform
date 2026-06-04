@@ -1,0 +1,7 @@
+region = "ap-south-1"
+mlflow_db_user     = "mlflow"
+mlflow_db_password = "changeme-dev-mlflow"
+aws_access_key     = "changeme-aws-key"
+aws_secret_key     = "changeme-aws-secret"
+grafana_password   = "changeme-grafana"
+slack_webhook      = "https://hooks.slack.com/services/T00/CHANGEME"

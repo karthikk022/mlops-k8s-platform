@@ -1,0 +1,71 @@
+groups:
+  - name: model_drift
+    interval: 5m
+    rules:
+      - alert: DataDriftDetected
+        expr: |
+          evidently_data_drift_score{feature=~".+"} > 0.3
+        for: 10m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Data drift detected for feature {{ $labels.feature }}"
+          description: "Feature {{ $labels.feature }} has drift score {{ $value | humanize }} (threshold: 0.3)"
+          runbook: "https://github.com/karthikk022/mlops-k8s-platform/wiki/Drift-Runbook"
+
+      - alert: ModelDriftCritical
+        expr: |
+          evidently_model_drift_score > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "Critical model drift detected"
+          description: "Model drift score is {{ $value | humanize }} (threshold: 0.5). Retraining required."
+          runbook: "https://github.com/karthikk022/mlops-k8s-platform/wiki/Model-Drift-Response"
+
+      - alert: PredictionDriftAnomaly
+        expr: |
+          rate(kserve_predictions_total[5m]) / rate(kserve_predictions_total[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Anomalous prediction volume spike"
+          description: "Prediction volume {{ $value }}x higher than hourly baseline"
+
+      - alert: ModelAccuracyDegradation
+        expr: |
+          mlflow_metric_accuracy < 0.75
+        for: 30m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "Model accuracy below threshold"
+          description: "Production model accuracy is {{ $value | humanize }} (< 0.75). Rollback recommended."
+
+      - alert: DataQualityIssue
+        expr: |
+          evidently_missing_values_ratio > 0.05
+        for: 15m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Data quality issue detected"
+          description: "Missing values ratio is {{ $value | humanize }} (> 5%) for {{ $labels.feature }}"
+
+      - alert: ModelServingLatencyHigh
+        expr: |
+          histogram_quantile(0.99, sum(rate(kserve_request_latency_seconds_bucket[5m])) by (le, model)) > 2
+        for: 5m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "P99 latency exceeds 2 seconds for {{ $labels.model }}"
+          description: "Model {{ $labels.model }} P99 latency is {{ $value | humanize }}s"

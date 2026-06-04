@@ -1,0 +1,6 @@
+apiVersion: v2
+name: evidently
+description: Evidently AI model drift monitoring
+version: 1.0.0
+appVersion: "0.4.27"
+type: application

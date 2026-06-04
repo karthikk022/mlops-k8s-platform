@@ -1,0 +1,13 @@
+project: mlops_platform
+registry: s3://feast-registry/mlops_platform/registry.db
+provider: aws
+
+online_store:
+  type: redis
+  host: redis-master.mlops.svc.cluster.local
+  port: 6379
+
+offline_store:
+  type: file
+
+entity_key_serialization_format: proto

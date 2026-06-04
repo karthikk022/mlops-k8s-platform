@@ -1,0 +1,83 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xeksclusters.platform.mlops.io
+spec:
+  group: platform.mlops.io
+  names:
+    kind: XEKSCluster
+    plural: xeksclusters
+  claimNames:
+    kind: EKSCluster
+    plural: eksclusters
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    version:
+                      type: string
+                      default: "1.30"
+                    nodeCount:
+                      type: integer
+                      default: 3
+                    instanceType:
+                      type: string
+                      default: "m6i.xlarge"
+                    environment:
+                      type: string
+                      enum: ["dev", "staging", "prod"]
+                  required:
+                    - environment
+---
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xmlservingenvironments.platform.mlops.io
+spec:
+  group: platform.mlops.io
+  names:
+    kind: XMLServingEnvironment
+    plural: xmlservingenvironments
+  claimNames:
+    kind: MLServingEnvironment
+    plural: mlservingenvironments
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    modelName:
+                      type: string
+                    modelVersion:
+                      type: string
+                    minReplicas:
+                      type: integer
+                      default: 1
+                    maxReplicas:
+                      type: integer
+                      default: 5
+                    targetTrafficPercent:
+                      type: integer
+                      default: 100
+                  required:
+                    - modelName
+                    - modelVersion

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: feast-feature-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: feast
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6566
+      targetPort: 6566
+      name: grpc
+  selector:
+    app: feast

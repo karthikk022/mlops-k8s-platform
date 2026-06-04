@@ -1,0 +1,26 @@
+{
+  "Role": "arn:aws:iam::ACCOUNT_ID:role/mlflow-s3-replication-prod",
+  "Rules": [
+    {
+      "Status": "Enabled",
+      "Filter": {},
+      "Destination": {
+        "Bucket": "arn:aws:s3:::mlflow-artifacts-prod-dr",
+        "StorageClass": "STANDARD_IA",
+        "ReplicationTime": {
+          "Status": "Enabled",
+          "Time": { "Minutes": 15 }
+        },
+        "Metrics": {
+          "Status": "Enabled",
+          "EventThreshold": { "Minutes": 15 }
+        }
+      },
+      "DeleteMarkerReplication": { "Status": "Enabled" },
+      "SourceSelectionCriteria": {
+        "SseKmsEncryptedObjects": { "Status": "Enabled" }
+      },
+      "Priority": 1
+    }
+  ]
+}

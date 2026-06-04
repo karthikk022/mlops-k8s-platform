@@ -1,0 +1,22 @@
+reference_data: s3://mlops-data/reference/train.parquet
+current_data: s3://mlops-data/current/predictions.parquet
+interval_seconds: 300
+
+column_mapping:
+  target: label
+  prediction: prediction
+  numerical_features: []
+  categorical_features: []
+
+drift_thresholds:
+  data_drift: 0.3
+  model_drift: 0.5
+  missing_values: 0.05
+
+prometheus:
+  port: 8085
+
+alerting:
+  slack_webhook: ""
+  drift_warning_threshold: 0.3
+  drift_critical_threshold: 0.5

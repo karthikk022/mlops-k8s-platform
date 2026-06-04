@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feast-feature-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: feast
+    component: feature-server
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: feast
+  template:
+    metadata:
+      labels:
+        app: feast
+        component: feature-server
+    spec:
+      containers:
+        - name: feast
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - feast
+            - serve
+            - --host=0.0.0.0
+            - --port=6566
+          volumeMounts:
+            - name: feast-config
+              mountPath: /etc/feast
+          ports:
+            - containerPort: 6566
+              name: grpc
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+      volumes:
+        - name: feast-config
+          configMap:
+            name: feast-config

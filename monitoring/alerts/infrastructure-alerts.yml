@@ -1,0 +1,68 @@
+groups:
+  - name: ml_infrastructure
+    interval: 1m
+    rules:
+      - alert: K8sNodeHighCPU
+        expr: |
+          node:node_cpu_utilization:avg > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Node CPU utilization > 85%"
+          description: "Node {{ $labels.node }} CPU at {{ $value | humanize }}%"
+
+      - alert: ModelServerHighMemory
+        expr: |
+          sum(container_memory_working_set_bytes{namespace="mlops", container="kserve-container"}) / sum(kube_pod_container_resource_limits{namespace="mlops", resource="memory"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Model server memory utilization > 85%"
+          description: "Memory at {{ $value | humanize }}%. Consider scaling up."
+
+      - alert: MLflowDown
+        expr: |
+          up{job="mlflow"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "MLflow service is down"
+          description: "MLflow registry unavailable. Training pipelines blocked."
+
+      - alert: FeatureStoreLatency
+        expr: |
+          feast_request_latency_seconds{status="error"} > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Feature store request latency high"
+          description: "P50 latency {{ $value | humanize }}s"
+
+      - alert: GPUNotUtilized
+        expr: |
+          nvidia_gpu_utilization < 0.1
+        for: 30m
+        labels:
+          severity: info
+          team: mlops
+        annotations:
+          summary: "GPU underutilized"
+          description: "GPU utilization {{ $value | humanize }}%. Consider right-sizing."
+
+      - alert: ModelVersionDrift
+        expr: |
+          count(mlflow_registered_model_version) by (model_name) > 10
+        labels:
+          severity: info
+          team: mlops
+        annotations:
+          summary: "High version count for {{ $labels.model_name }}"
+          description: "Model {{ $labels.model_name }} has {{ $value }} versions. Consider archiving."

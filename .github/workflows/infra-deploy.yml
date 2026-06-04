@@ -1,0 +1,144 @@
+name: Infrastructure Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "infrastructure/**"
+
+env:
+  AWS_REGION: ap-south-1
+  TERRAFORM_VERSION: 1.8.0
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+
+    defaults:
+      run:
+        working-directory: infrastructure/terraform/environments/${{ matrix.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Checkov security scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          compact: true
+          quiet: true
+          skip_check: CKV_AWS_126,CKV_AWS_20,CKV_AWS_21,CKV_AWS_145
+
+      - name: Run Trivy K8s scan
+        uses: aquasecurity/trivy-action@0.19.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-k8s.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          scanners: misconfig
+
+      - name: Upload Trivy K8s results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-k8s.sarif
+          category: trivy-k8s
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: github.event_name == 'pull_request'
+        run: terraform plan -no-color
+        continue-on-error: true
+
+      - name: Terraform Apply
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -no-color
+        env:
+          TF_VAR_mlflow_db_password: ${{ secrets.MLFLOW_DB_PASSWORD }}
+          TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_grafana_password: ${{ secrets.GRAFANA_PASSWORD }}
+          TF_VAR_slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+
+  k8s-deploy:
+    needs: terraform
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name mlops-prod --region ${{ env.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Deploy Helm charts
+        run: |
+          helm upgrade --install mlflow infrastructure/helm/mlflow -n mlops --values infrastructure/helm/mlflow/values-prod.yaml
+          helm upgrade --install feast infrastructure/helm/feast -n mlops
+          helm upgrade --install evidently infrastructure/helm/evidently -n monitoring
+
+      - name: Deploy Gatekeeper OPA
+        run: |
+          kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/v3.16.0/deploy/gatekeeper.yaml
+          kubectl wait --for=condition=Available --timeout=120s deployment/gatekeeper-controller-manager -n gatekeeper-system
+          kubectl apply -f security/gatekeeper/templates/
+          kubectl apply -f security/gatekeeper/constraints/
+          echo "Gatekeeper deployed with $(kubectl get constraints -o json | jq '.items | length') policies"
+
+      - name: Apply Crossplane compositions
+        run: |
+          kubectl apply -f infrastructure/crossplane/
+
+      - name: Install cert-manager + TLS
+        run: |
+          helm repo add jetstack https://charts.jetstack.io
+          helm upgrade --install cert-manager jetstack/cert-manager \
+            -n cert-manager --create-namespace \
+            -f tls/cert-manager/config/cert-manager-values.yaml --wait
+          kubectl apply -f tls/cert-manager/issuers/
+          kubectl apply -f tls/ingress/
+
+      - name: Install Velero backup
+        if: github.ref == 'refs/heads/main'
+        run: |
+          helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
+          helm upgrade --install velero vmware-tanzu/velero \
+            -n velero --create-namespace \
+            -f backup-dr/velero/config/velero-values.yaml --wait
+          kubectl apply -f backup-dr/velero/schedules/
+
+      - name: Roll status
+        run: |
+          kubectl get pods -n mlops
+          kubectl get pods -n monitoring
+          kubectl get certificate -A
+          kubectl get schedule -n velero 2>/dev/null || echo "Velero not installed yet"

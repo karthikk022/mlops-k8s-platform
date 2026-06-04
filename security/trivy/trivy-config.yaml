@@ -1,0 +1,19 @@
+severity: HIGH,CRITICAL
+vulnerability:
+  type:
+    - os
+    - library
+scan:
+  scanners:
+    - vuln
+    - secret
+    - misconfig
+  skip-dirs:
+    - /usr/local/lib/python3.11/site-packages
+  skip-files:
+    - "*.pyc"
+    - ".coverage"
+output: trivy-report.json
+format: json
+exit-code: 1
+ignore-unfixed: false

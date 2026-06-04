@@ -1,0 +1,123 @@
+name: ML Training Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ml-pipeline/**"
+      - "feature-store/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "ml-pipeline/**"
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: "Dataset S3 path"
+        required: false
+        default: "s3://mlops-data/datasets/latest.parquet"
+      experiment:
+        description: "MLflow experiment name"
+        required: false
+        default: "mlops-platform/ci-triggered"
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+  MLFLOW_TRACKING_URI: http://mlflow.mlops:5000
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r ml-pipeline/training/requirements.txt
+      - name: Run data validation
+        run: |
+          python -c "
+          from great_expectations.dataset import PandasDataset
+          import pandas as pd
+          import boto3, io
+          s3 = boto3.client('s3', region_name='${{ env.AWS_REGION }}')
+          obj = s3.get_object(Bucket='mlops-data', Key='datasets/latest.parquet')
+          df = pd.read_parquet(io.BytesIO(obj['Body'].read()))
+          ge_df = PandasDataset(df)
+          print(f'Validated {len(df)} rows, {len(df.columns)} columns')
+          "
+
+  build-and-push:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [training, preprocessing, evaluation]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to ECR
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+      - name: Build
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t ${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:$IMAGE_TAG ml-pipeline/${{ matrix.component }}
+          echo "image=${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.19.0
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.component }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.component }}.sarif
+          category: trivy-${{ matrix.component }}
+
+      - name: Push to ECR
+        run: |
+          docker push ${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:${{ github.sha }}
+
+  train:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name mlops-${{ github.ref_name == 'main' && 'prod' || 'dev' }} --region ${{ env.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Submit Kubeflow pipeline
+        run: |
+          pip install kfp
+          python ml-pipeline/pipeline.py
+          kfp --endpoint ${{ secrets.KFP_ENDPOINT }} pipeline upload -p ml-training-pipeline ml-training-pipeline.yaml
+      - name: Trigger training
+        run: |
+          kubectl create job --from=cronjob/ml-training-pipeline ml-manual-train-${{ github.sha }} -n mlops
+
+  register:
+    needs: train
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for MLflow run
+        run: |
+          pip install mlflow
+          run_id=$(mlflow runs list --experiment-name ${{ github.event.inputs.experiment || 'mlops-platform/ci-triggered' }} --limit 1 --output json | python -c "import sys,json; print(json.load(sys.stdin)[0]['run_id'])")
+          mlflow runs tag --run-id $run_id github-sha ${{ github.sha }}
+          mlflow runs tag --run-id $run_id github-ref ${{ github.ref }}
+          echo "Registered run $run_id"
