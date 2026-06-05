@@ -61,7 +61,7 @@ jobs:
           skip_check: CKV_AWS_126,CKV_AWS_20,CKV_AWS_21,CKV_AWS_145
 
       - name: Run Trivy K8s scan
-        uses: aquasecurity/trivy-action@0.19.0
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           scan-type: fs
           scan-ref: .

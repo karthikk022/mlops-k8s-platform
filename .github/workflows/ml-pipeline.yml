@@ -78,7 +78,7 @@ jobs:
           echo "image=${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.19.0
+        uses: aquasecurity/trivy-action@0.29.0
         with:
           image-ref: ${{ env.ECR_REGISTRY }}/ml-${{ matrix.component }}:${{ github.sha }}
           format: sarif
