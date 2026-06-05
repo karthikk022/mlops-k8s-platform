@@ -1,0 +1,27 @@
+environment: prod
+replicas: 3
+
+image:
+  tag: v2.14.0
+
+storage:
+  bucket: mlflow-artifacts-prod
+  region: ap-south-1
+
+postgres:
+  host: mlflow-prod.cluster-xxxxxxxxxxx.ap-south-1.rds.amazonaws.com
+  port: 5432
+  database: mlflow
+  username: mlflow
+
+resources:
+  requests:
+    cpu: 1
+    memory: 2Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
+
+ingress:
+  enabled: true
+  host: mlflow.prod.mlops.platform

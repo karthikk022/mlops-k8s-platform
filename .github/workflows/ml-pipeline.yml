@@ -36,6 +36,12 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - run: pip install -r ml-pipeline/training/requirements.txt
+
+      - name: Run local ML pipeline tests
+        run: |
+          pip install pytest pyyaml
+          python -m pytest tests/test_ml_pipeline.py tests/test_configs.py -v --tb=short
+
       - name: Run data validation
         run: |
           python -c "

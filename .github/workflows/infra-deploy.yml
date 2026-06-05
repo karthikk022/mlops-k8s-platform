@@ -28,6 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Run config validation tests
+        run: |
+          pip install pytest pyyaml
+          python -m pytest tests/test_configs.py -v --tb=short
+
+      - name: Run infra validation tests
+        run: |
+          bash tests/test_infra.sh
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
