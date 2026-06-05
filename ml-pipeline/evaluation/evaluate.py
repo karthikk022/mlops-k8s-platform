@@ -10,8 +10,8 @@ from sklearn.metrics import (
 import json
 
 
-def evaluate(model_uri: str, test_path: str, target_column: str, min_metrics: dict):
-    mlflow.set_tracking_uri("http://mlflow.mlops:5000")
+def evaluate(model_uri: str, test_path: str, target_column: str, min_metrics: dict, tracking_uri: str = "http://mlflow.mlops:5000"):
+    mlflow.set_tracking_uri(tracking_uri)
 
     model = mlflow.sklearn.load_model(model_uri)
     test = pd.read_parquet(test_path)

@@ -18,13 +18,18 @@ jobs:
           cache: "pip"
 
       - name: Install test dependencies
-        run: pip install pytest pyyaml
+        run: pip install pytest pyyaml scikit-learn pandas pyarrow mlflow
 
       - name: YAML & JSON validation
         run: python -m pytest tests/test_configs.py -v --tb=short
 
       - name: ML pipeline unit tests
         run: python -m pytest tests/test_ml_pipeline.py -v --tb=short
+
+      - name: End-to-end training tests
+        env:
+          MLFLOW_ALLOW_FILE_STORE: "true"
+        run: python -m pytest tests/test_training_e2e.py -v --tb=short
 
       - name: Infrastructure validation
         run: bash tests/test_infra.sh

@@ -17,7 +17,7 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def train(config: dict):
+def train(config: dict, config_path: str = None):
     mlflow.set_tracking_uri(config["tracking_uri"])
     mlflow.set_experiment(config["experiment_name"])
 
@@ -38,7 +38,9 @@ def train(config: dict):
         if model_class is None:
             raise ValueError(f"Unknown model type: {config['model']['type']}")
 
-        model = model_class(**config["model"]["params"], random_state=42)
+        params = config["model"]["params"].copy()
+        params.setdefault("random_state", 42)
+        model = model_class(**params)
         model.fit(X_train, y_train)
 
         y_pred = model.predict(X_test)
@@ -56,7 +58,8 @@ def train(config: dict):
         mlflow.log_params(config["model"]["params"])
         mlflow.log_params({"model_type": config["model"]["type"]})
         mlflow.log_metrics(metrics)
-        mlflow.log_artifact(config_path)
+        if config_path:
+            mlflow.log_artifact(config_path)
         mlflow.sklearn.log_model(model, "model")
 
         if config.get("register_model", False):
@@ -81,4 +84,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = load_config(args.config)
-    train(config)
+    train(config, config_path=args.config)

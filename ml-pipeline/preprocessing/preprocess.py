@@ -36,6 +36,12 @@ def preprocess(input_path: str, output_path: str, test_size: float, target_colum
     if numeric_cols:
         df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
+    feature_cols = numeric_cols + categorical_cols
+    drop_cols = [c for c in df.columns if c not in feature_cols and c != target_column]
+    if drop_cols:
+        print(f"Dropping non-feature columns: {drop_cols}")
+    df = df.drop(columns=drop_cols)
+
     os.makedirs(output_path, exist_ok=True)
 
     train, test = train_test_split(df, test_size=test_size, random_state=42, stratify=df[target_column])
