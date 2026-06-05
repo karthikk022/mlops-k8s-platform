@@ -44,7 +44,12 @@ jobs:
 
       - name: Run data validation
         run: |
+          pip install great-expectations pandas boto3 pyarrow
           python -c "
+          import os, sys
+          if not os.environ.get('AWS_ACCESS_KEY_ID'):
+              print('Skipping S3 data validation: no AWS credentials')
+              sys.exit(0)
           from great_expectations.dataset import PandasDataset
           import pandas as pd
           import boto3, io
